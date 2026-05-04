@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import type { Feed, Episode, PagedResult, ConfigResponse } from '../types';
-import { feedsApi, configApi } from '../services/api';
+import { feedsApi, configApi, jobsApi } from '../services/api';
 import DownloadButton from './DownloadButton';
 import PlayButton from './PlayButton';
 import ProcessingStatsButton from './ProcessingStatsButton';
@@ -331,6 +331,17 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
           feedId: currentFeed.id,
         },
       });
+    },
+  });
+
+  const cancelFeedQueuedJobsMutation = useMutation({
+    mutationFn: () => jobsApi.cancelFeedQueuedJobs(currentFeed.id),
+    onSuccess: (data) => {
+      toast.success(data.message ?? 'Queued jobs cancelled');
+    },
+    onError: (err) => {
+      console.error('Failed to cancel feed queued jobs', err);
+      toast.error('Failed to cancel queued jobs');
     },
   });
 
@@ -888,6 +899,18 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
                       )}
 
                       {isAdmin && (
+                        <>
+                        <button
+                          onClick={() => {
+                            cancelFeedQueuedJobsMutation.mutate();
+                            setShowMenu(false);
+                          }}
+                          disabled={cancelFeedQueuedJobsMutation.isPending}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="text-orange-500">✕</span>
+                          Cancel queued jobs
+                        </button>
                         <button
                           onClick={() => {
                             setShowHelp(!showHelp);
@@ -898,6 +921,7 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
                           <span className="text-blue-600">ℹ️</span>
                           Explain whitelist
                         </button>
+                        </>
                       )}
 
                     <button

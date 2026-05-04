@@ -59,13 +59,20 @@ def clear_all_jobs_action(params: dict[str, Any]) -> int:
 
 
 def clear_active_jobs_action(params: dict[str, Any]) -> int:
-    """Clear only pending and running jobs. Preserves completed/failed/skipped/cancelled."""
+    """Cancel pending/running jobs on startup.
+
+    Marks them cancelled rather than deleting so _ensure_jobs_for_all_posts
+    does not immediately re-create them for every whitelisted episode.
+    """
     active_jobs = ProcessingJob.query.filter(
         ProcessingJob.status.in_(["pending", "running"])
     ).all()
     count = len(active_jobs)
+    now = datetime.now(UTC).replace(tzinfo=None)
     for job in active_jobs:
-        db.session.delete(job)
+        job.status = "cancelled"
+        job.error_message = "Cancelled on startup"
+        job.completed_at = now
     if count > 0:
         recalculate_run_counts(db.session)
     return count
