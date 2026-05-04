@@ -105,6 +105,7 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
     setEpisodeDescriptionView(view ?? loadGlobalEpisodeDescriptionView());
   };
   const [showSubscribersModal, setShowSubscribersModal] = useState(false);
+  const [confirmCancelFeedJobs, setConfirmCancelFeedJobs] = useState(false);
 
   const isAdmin = !requireAuth || user?.role === 'admin';
   const whitelistedOnly = requireAuth && !isAdmin;
@@ -338,6 +339,7 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
     mutationFn: () => jobsApi.cancelFeedQueuedJobs(currentFeed.id),
     onSuccess: (data) => {
       toast.success(data.message ?? 'Queued jobs cancelled');
+      queryClient.invalidateQueries({ queryKey: ['episodes', currentFeed.id] });
     },
     onError: (err) => {
       console.error('Failed to cancel feed queued jobs', err);
@@ -458,6 +460,7 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
     const handleClickOutside = (event: MouseEvent) => {
       if (showMenu && !(event.target as Element).closest('.menu-container')) {
         setShowMenu(false);
+        setConfirmCancelFeedJobs(false);
       }
     };
 
@@ -855,7 +858,10 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
                 {/* Ellipsis Menu */}
                 <div className="relative menu-container shrink-0">
                   <button
-                    onClick={() => setShowMenu(!showMenu)}
+                    onClick={() => {
+                      if (showMenu) setConfirmCancelFeedJobs(false);
+                      setShowMenu(!showMenu);
+                    }}
                     className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-800"
                   >
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -900,17 +906,36 @@ export default function FeedDetail({ feed, onClose, onFeedDeleted }: FeedDetailP
 
                       {isAdmin && (
                         <>
-                        <button
-                          onClick={() => {
-                            cancelFeedQueuedJobsMutation.mutate();
-                            setShowMenu(false);
-                          }}
-                          disabled={cancelFeedQueuedJobsMutation.isPending}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="text-orange-500">✕</span>
-                          Cancel queued jobs
-                        </button>
+                        {confirmCancelFeedJobs ? (
+                          <div className="px-4 py-2 flex items-center gap-2">
+                            <span className="text-sm text-red-700 font-medium flex-1">Cancel queued jobs?</span>
+                            <button
+                              onClick={() => {
+                                setConfirmCancelFeedJobs(false);
+                                cancelFeedQueuedJobsMutation.mutate();
+                                setShowMenu(false);
+                              }}
+                              className="rounded bg-red-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-red-700"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancelFeedJobs(false)}
+                              className="rounded bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCancelFeedJobs(true)}
+                            disabled={cancelFeedQueuedJobsMutation.isPending}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span className="text-orange-500">✕</span>
+                            {cancelFeedQueuedJobsMutation.isPending ? 'Cancelling…' : 'Cancel queued jobs'}
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setShowHelp(!showHelp);
